@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>シャトルラン計測アプリ</title>
+    <style>
+        /* --- ベーススタイル --- */
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary-color: #64748b;
+            --danger-color: #ef4444;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --bg-color: #f3f4f6;
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- ユーティリティ --- */
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .w-full { width: 100%; }
+        .h-full { height: 100%; }
+        .text-center { text-align: center; }
+        .font-bold { font-weight: bold; }
+        .text-sm { font-size: 0.875rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .p-2 { padding: 0.5rem; }
+        .p-3 { padding: 0.75rem; }
+        .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); }
+        .rounded { border-radius: 0.375rem; }
+
+        /* --- ヘッダー --- */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        header h1 { margin: 0; font-size: 1.25rem; display: flex; align-items: center; }
+        
+        /* --- メインエリア --- */
+        main { flex-grow: 1; position: relative; overflow: hidden; }
+        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background-color: var(--bg-color); overflow-y: auto; }
+        
+        /* --- フォーム要素 --- */
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            background-color: white;
+        }
+        input:focus, textarea:focus, select:focus { outline: 2px solid var(--primary-color); border-color: transparent; }
+        
+        /* --- ボタン --- */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: bold;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-blue { background-color: var(--primary-color); }
+        .btn-blue:hover { background-color: var(--primary-hover); }
+        .btn-green { background-color: var(--success-color); }
+        .btn-gray { background-color: var(--secondary-color); }
+        .btn-red { background-color: var(--danger-color); }
+        .btn-orange { background-color: var(--warning-color); }
+        .btn-indigo { background-color: #6366f1; }
+        .btn-teal { background-color: #14b8a6; }
+        .btn-circle { width: 3rem; height: 3rem; border-radius: 9999px; padding: 0; font-size: 1.25rem; }
+
+        /* --- 計測カウンター --- */
+        .counter-area { background: white; padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; gap: 1rem; z-index: 5; }
+        #counter-btn {
+            flex: 1; max-width: 36rem; height: 7rem;
+            background-color: var(--primary-color); color: white;
+            border-radius: 0.75rem; border: none;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden; cursor: pointer;
+        }
+        #counter-btn:active { transform: scale(0.98); }
+        #counter-btn.active-red { background-color: var(--danger-color); }
+        .counter-val { font-size: 4rem; font-weight: 800; line-height: 1; letter-spacing: -0.05em; }
+        .counter-label { font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.25rem; }
+
+        /* リップルエフェクト */
+        .ripple::after {
+            content: ""; display: block; position: absolute;
+            width: 100%; height: 100%; top: 0; left: 0;
+            background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+            background-repeat: no-repeat; background-position: 50%;
+            transform: scale(10, 10); opacity: 0; transition: transform .5s, opacity 1s; pointer-events: none;
+        }
+        .ripple:active::after { transform: scale(0, 0); opacity: .3; transition: 0s; }
+
+        /* --- カードグリッド --- */
+        #cards-area-wrapper { flex-grow: 1; overflow-y: auto; padding: 0.25rem; background-color: #e5e7eb; display: flex; flex-direction: column; }
+        .group-container { width: 100%; padding: 0.5rem; min-height: 180px; flex-shrink: 0; border-bottom: 4px solid #9ca3af; }
+        .group-container:last-child { border-bottom: none; }
+        .group-header { 
+            font-weight: bold; color: #4b5563; margin-bottom: 0.5rem; padding: 0.25rem 0.5rem;
+            background-color: rgba(255,255,255,0.8); border-radius: 0.25rem;
+            position: sticky; top: 0; z-index: 5; display: flex; align-items: center;
+        }
+        
+        .card-grid {
+            display: grid; gap: 0.5rem; padding-bottom: 2rem;
+            grid-template-columns: repeat(3, 1fr);
+        }
+        @media (min-width: 640px) { .card-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (min-width: 768px) { .card-grid { grid-template-columns: repeat(6, 1fr); } }
+
+        /* --- 生徒カード --- */
+        .student-card {
+            background-color: white; border: 2px solid #d1d5db; border-radius: 0.5rem;
+            height: 5.5rem; /* h-22相当 */
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative; cursor: pointer;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            touch-action: none; /* ドラッグ操作用 */
+        }
+        .student-card:active { transform: scale(0.96); }
+        .student-card.male { background-color: #dbeafe; border-color: #93c5fd; color: #1e3a8a; }
+        .student-card.female { background-color: #fce7f3; border-color: #f9a8d4; color: #831843; }
+        .student-card.is-out { background-color: #d1d5db; border-color: #9ca3af; color: #6b7280; opacity: 0.8; }
+        
+        .student-card.cursor-grab { cursor: grab; }
+        .student-card.cursor-grab:active { cursor: grabbing; }
+
+        /* ドラッグ中のスタイル */
+        .card-placeholder { opacity: 0.3; border: 2px dashed #64748b; background: #cbd5e1; border-radius: 0.5rem; }
+        .card-avatar { 
+            position: fixed; z-index: 9999; pointer-events: none; 
+            opacity: 0.9; transform: scale(1.05) rotate(2deg); 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2); 
+        }
+
+        /* --- テーブル --- */
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th { background-color: #f3f4f6; color: #4b5563; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; padding: 0.75rem; border-bottom: 2px solid #e5e7eb; text-align: left; }
+        td { padding: 0.75rem; border-bottom: 1px solid #e5e7eb; font-size: 0.875rem; }
+        th:last-child, td:last-child { text-align: right; }
+
+        /* --- アイコンSVG用 --- */
+        .icon { width: 1em; height: 1em; fill: currentColor; display: inline-block; vertical-align: middle; }
+        .mr-1 { margin-right: 0.25rem; }
+        .mr-2 { margin-right: 0.5rem; }
+
+        /* --- トグルスイッチ --- */
+        .toggle-switch { position: relative; display: inline-block; width: 2.75rem; height: 1.5rem; margin-right: 0.5rem;}
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 1.1rem; width: 1.1rem; left: 0.2rem; bottom: 0.2rem; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--warning-color); }
+        input:checked + .slider:before { transform: translateX(1.25rem); }
+
+        /* --- モーダル --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background-color: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center; z-index: 50;
+        }
+        .modal-box {
+            background: white; padding: 1.5rem; border-radius: 0.5rem;
+            width: 90%; max-width: 24rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ヘッダー -->
+    <header>
+        <h1>
+            <!-- SVG: Running -->
+            <svg class="icon mr-2" viewBox="0 0 512 512"><path d="M389.2 138.5c24.6 20.2 46.6 42.6 65.6 66.8 6.7 8.6 6.4 21-.8 29.2-7 8-19.1 9.3-27.7 2.9-15.5-11.6-32.3-22.1-50.1-31.2l-23 60.1c-12.7 33.3-43.3 56.1-78.8 58.7l-72.2 5.3 49.3 58.6c13.7 16.3 12.6 40.5-2.6 55.5-15.1 15-39.7 15.1-54.9 0l-77.9-77.3c-24.6-24.4-28-63-8-91.1l70.7-99.3c5.6-7.9 14-13.2 23.5-14.8l77.7-13.3c-2.4-12-8.3-23-17.2-31.9-8.8-8.8-22.3-13.2-34.9-11.2l-58.4 9.1c-10.7 1.7-21-5.6-22.7-16.3s5.6-21 16.3-22.7l58.4-9.1c25-3.9 51.5 4.7 69.1 22.3 17.6 17.6 26.2 44.1 22.3 69.1l8.1-1.3c8.6-1.3 17.1.9 23.9 6.2zm-2.8-66.3c0-26.5 21.5-48 48-48s48 21.5 48 48-21.5 48-48 48-48-21.5-48-48z"/></svg>
+            シャトルラン計測
+        </h1>
+        <div id="current-screen-name" style="font-size: 0.9rem;">クラス登録</div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main>
+        
+        <!-- 1. クラス登録画面 -->
+        <div id="screen-register" class="screen" style="align-items: center; padding: 1rem;">
+            <div style="width: 100%; max-width: 48rem; background: white; border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.125rem; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 1rem;">新規クラス登録</h2>
+                
+                <div class="mb-2">
+                    <label style="display:block; font-size:0.875rem; font-weight:bold; margin-bottom:0.5rem; color:#374151;">クラス名</label>
+                    <input type="text" id="reg-class-name" placeholder="例: 6年1組">
+                </div>
+
+                <div class="mb-2" style="margin-top: 1rem;">
+                    <label style="display:block; font-size:0.875rem; font-weight:bold; margin-bottom:0.5rem; color:#374151;">
+                        氏名リスト登録 (Excel/スプレッドシートから貼り付け)
+                        <span style="font-weight:normal; color:#6b7280; font-size:0.75rem; margin-left:0.5rem;">※形式: 氏名 [タブ or カンマ] 性別(男/女)</span>
+                    </label>
+                    <textarea id="reg-students-text" style="height: 10rem; font-family: monospace;" placeholder="山田太郎  男&#13;&#10;鈴木花子,女&#13;&#10;佐藤 健  m&#13;&#10;田中美咲,f"></textarea>
+                </div>
+
+                <div class="flex" style="gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;">
+                    <button onclick="registerClass()" class="btn btn-blue" style="flex: 2;">
+                        <svg class="icon mr-2" viewBox="0 0 512 512"><path d="M256 8C119 8 8 119 8 256s111 248 248 248 248-111 248-248S393 8 256 8zm144 276c0 6.6-5.4 12-12 12h-92v92c0 6.6-5.4 12-12 12h-56c-6.6 0-12-5.4-12-12v-92h-92c-6.6 0-12-5.4-12-12v-56c0-6.6 5.4-12 12-12h92v-92c0-6.6 5.4-12 12-12h56c6.6 0 12 5.4 12 12v92h92c6.6 0 12 5.4 12 12v56z"/></svg>
+                        クラスを登録
+                    </button>
+                    <button onclick="exportData()" class="btn btn-teal" style="flex: 1;">
+                        <svg class="icon mr-1" viewBox="0 0 512 512"><path d="M216 0h80c13.3 0 24 10.7 24 24v168h87.7c17.8 0 26.7 21.5 14.1 34.1L269.7 378.3c-7.5 7.5-19.8 7.5-27.3 0L90.1 226.1c-12.6-12.6-3.7-34.1 14.1-34.1H192V24c0-13.3 10.7-24 24-24zm296 376v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h146.7l49 49c20.1 20.1 52.5 20.1 72.6 0l49-49H488c13.3 0 24 10.7 24 24z"/></svg>
+                        保存
+                    </button>
+                    <button onclick="triggerImport()" class="btn btn-orange" style="flex: 1;">
+                        <svg class="icon mr-1" viewBox="0 0 512 512"><path d="M16 288c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h112v-64zm489-183L409.5 9.5a24 24 0 0 0-17-7H256b-17.7 0-32 14.3-32 32v224h-96l111.5 111.5c7.5 7.5 19.8 7.5 27.3 0L384 256h-96V64h96c8.8 0 16 7.2 16 16v48h64V128c0-8.8-7.2-16-16-16zM232 416H16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h216v-64z"/></svg>
+                        読込
+                    </button>
+                </div>
+                <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(this)">
+            </div>
+
+            <!-- クラスリスト -->
+            <div style="width: 100%; max-width: 48rem;">
+                <h3 style="font-weight:bold; color:#4b5563; margin-bottom:0.5rem;">登録済みクラス一覧</h3>
+                <div id="class-list-container" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+            </div>
+
+            <!-- フッター -->
+            <div style="margin-top: auto; padding-top: 2rem; padding-bottom: 2rem; width: 100%; max-width: 48rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <button onclick="navigateTo('measure')" class="btn btn-green" style="padding: 1rem; font-size: 1.25rem;">
+                    <svg class="icon mr-2" viewBox="0 0 448 512"><path d="M432 304c0 114.9-93.1 208-208 208S16 418.9 16 304c0-104.5 76.3-191.2 176-205.5V64h-28c-6.6 0-12-5.4-12-12V12c0-6.6 5.4-12 12-12h120c6.6 0 12 5.4 12 12v40c0 6.6-5.4 12-12 12h-28v34.5c99.7 14.3 176 101 176 205.5zm-64 0c0-79.5-64.5-144-144-144s-144 64.5-144 144 64.5 144 144 144 144-64.5 144-144z"/></svg>
+                    計測画面へ
+                </button>
+                <div class="flex" style="gap: 0.75rem;">
+                    <button onclick="navigateTo('result')" class="btn btn-indigo" style="flex: 1;">
+                        <svg class="icon mr-2" viewBox="0 0 512 512"><path d="M496 384H64V80c0-8.84-7.16-16-16-16H16C7.16 64 0 71.16 0 80v336c0 17.67 14.33 32 32 32h464c8.84 0 16-7.16 16-16v-32c0-8.84-7.16-16-16-16zM464 96H345.94c-21.38 0-32.09 25.85-16.97 40.97l32.4 32.4L288 242.75l-73.37-73.37c-12.5-12.5-32.76-12.5-45.25 0l-68.69 68.69c-6.25 6.25-6.25 16.38 0 22.63l22.62 22.62c6.25 6.25 16.38 6.25 22.63 0L192 237.25l73.37 73.37c12.5 12.5 32.76 12.5 45.25 0l96-96 32.4 32.4c15.12 15.12 40.97 4.41 40.97-16.97V112c.01-8.84-7.15-16-15.99-16z"/></svg>
+                        結果を見る
+                    </button>
+                    <button onclick="resetAllData()" class="btn btn-red" style="flex: 1;">
+                        <svg class="icon mr-2" viewBox="0 0 448 512"><path d="M32 464a48 48 0 0 0 48 48h288a48 48 0 0 0 48-48V128H32zm272-256a16 16 0 0 1 32 0v224a16 16 0 0 1-32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1-32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1-32 0zM432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"/></svg>
+                        データリセット
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 計測画面 -->
+        <div id="screen-measure" class="screen hidden">
+            <!-- コントロールバー -->
+            <div style="background:white; padding:0.5rem; box-shadow:0 1px 3px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center; z-index:20;">
+                <div class="flex items-center" style="gap:0.5rem; overflow-x:auto;">
+                    <select id="measure-class-select" onchange="loadClassForMeasure()" style="width:auto; max-width:150px;"></select>
+                    <select id="measure-group-count" onchange="changeGroupCount(this.value)" style="width:auto;">
+                        <option value="1">1グループ</option>
+                        <option value="2">2グループ</option>
+                        <option value="3">3グループ</option>
+                    </select>
+                    
+                    <div style="display:flex; align-items:center; margin-left:0.5rem; padding-left:0.5rem; border-left:1px solid #ccc;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="group-edit-toggle" onchange="toggleGroupEditMode()">
+                            <span class="slider"></span>
+                        </label>
+                        <span style="font-size:0.875rem; font-weight:bold; color:#4b5563;">編成モード</span>
+                    </div>
+
+                    <select id="measure-gender-filter" onchange="renderStudentCards()" style="width:auto; margin-left:0.5rem;">
+                        <option value="all">全員</option>
+                        <option value="M">男子のみ</option>
+                        <option value="F">女子のみ</option>
+                    </select>
+                </div>
+                <div class="flex" style="gap:0.5rem;">
+                    <button onclick="navigateTo('result')" class="btn btn-indigo" style="font-size:0.875rem;">一覧</button>
+                    <button onclick="navigateTo('register')" class="btn btn-gray" style="font-size:0.875rem;">TOP</button>
+                </div>
+            </div>
+
+            <!-- カウンター -->
+            <div class="counter-area">
+                <button onclick="manualAdjust(-1)" class="btn btn-gray btn-circle"><svg class="icon" viewBox="0 0 448 512"><path d="M416 208H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg></button>
+                
+                <button id="counter-btn" onclick="incrementCounter()">
+                    <span class="counter-label">現在の回数（タッチで増加）</span>
+                    <span id="counter-display" class="counter-val">START</span>
+                </button>
+
+                <button onclick="manualAdjust(1)" class="btn btn-gray btn-circle"><svg class="icon" viewBox="0 0 448 512"><path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"/></svg></button>
+                
+                <button onclick="confirmResetCounter()" class="btn btn-orange btn-circle" title="リセット">
+                    <svg class="icon" viewBox="0 0 512 512"><path d="M255.54 48.54l-97.97 98 97.97 98h51.5v-62.13h105.07c57.04 0 96.92 48.67 96.92 97.26 0 48.29-37.58 99.14-93.73 99.14h-172.6v53.19h182.2c84.28 0 137.11-73.61 137.11-152.33 0-82.93-61.9-149.32-137.11-149.32H309.04V69.96h-53.5zM69.04 233.15c-19.92 34.69-23.77 82.26 10.97 117.27l37.78-37.79c-12.72-13.62-10.7-33.19 1.15-52.54L69.04 233.15z"/></svg>
+                </button>
+            </div>
+
+            <!-- カードエリア -->
+            <div id="cards-area-wrapper">
+                <!-- JS生成 -->
+            </div>
+            
+            <!-- ステータスバー -->
+            <div style="background:#1f2937; color:white; padding:0.5rem; text-align:center; font-size:0.875rem; z-index:20; display:flex; justify-content:space-between; flex-shrink:0;">
+                <span>残り人数: <span id="active-count" style="font-weight:bold; color:var(--warning-color);">0</span> 名</span>
+                <span style="color:#9ca3af;">カードをタッチして記録</span>
+            </div>
+        </div>
+
+        <!-- 3. 結果画面 -->
+        <div id="screen-result" class="screen hidden">
+            <div style="background:white; padding:0.75rem; box-shadow:0 1px 2px rgba(0,0,0,0.1); flex-shrink:0;">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="font-bold text-lg">測定結果</h2>
+                    <select id="result-class-select" onchange="loadClassForResult()" style="width:auto;"></select>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-sort-score" onclick="sortResults('score')" class="btn" style="flex:1;">記録順</button>
+                    <button id="btn-sort-number" onclick="sortResults('number')" class="btn" style="flex:1;">番号順</button>
+                </div>
+            </div>
+
+            <div style="flex-grow:1; overflow-y:auto; padding:0.5rem;">
+                <div style="background:white; border-radius:0.5rem; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow:hidden;">
+                    <table id="result-table">
+                        <thead>
+                            <tr>
+                                <th style="width:3rem;">No</th>
+                                <th>氏名</th>
+                                <th style="width:4rem;">性別</th>
+                                <th style="width:5rem;">回数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="result-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="padding:0.75rem; background:white; border-top:1px solid #e5e7eb; display:flex; gap:0.5rem; flex-shrink:0;">
+                <button onclick="copyToClipboard()" class="btn btn-green" style="flex:1;">
+                    <svg class="icon mr-2" viewBox="0 0 448 512"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg>コピー
+                </button>
+                <button onclick="navigateTo('measure')" class="btn btn-green" style="flex:1;">計測画面</button>
+                <button onclick="navigateTo('register')" class="btn btn-gray" style="flex:1;">TOP</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 通知トースト -->
+    <div id="toast" style="position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); background:#1f2937; color:white; padding:0.75rem 1.5rem; border-radius:9999px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); transition:opacity 0.3s; opacity:0; pointer-events:none; z-index:100;">
+        メッセージ
+    </div>
+
+    <!-- モーダル -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h3 id="modal-title" class="font-bold text-lg mb-2">確認</h3>
+            <p id="modal-message" style="margin-bottom:1.5rem; color:#4b5563;">メッセージ</p>
+            <div class="flex justify-between" style="justify-content: flex-end; gap: 0.5rem;">
+                <button onclick="closeModal()" class="btn btn-gray">キャンセル</button>
+                <button id="modal-confirm-btn" class="btn btn-red">実行</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- データ構造 ---
+let appData = { classes: [] };
+let currentClassId = null;
+let currentCount = 0;
+let currentSortType = 'number';
+let isGroupEditMode = false;
+const MAX_COUNT = 247;
+let pendingConfirmAction = null;
+let audioCtx = null;
+
+// --- 自作ドラッグ＆ドロップ管理クラス (外部ライブラリ不使用) ---
+class SimpleDnD {
+    constructor() {
+        this.dragEl = null;
+        this.avatar = null;
+        this.placeholder = null;
+        this.isDragging = false;
+        this.startX = 0; this.startY = 0;
+        this.container = null;
+        
+        // バインド
+        this.onDown = this.onDown.bind(this);
+        this.onMove = this.onMove.bind(this);
+        this.onUp = this.onUp.bind(this);
+        
+        document.addEventListener('pointerdown', this.onDown, {passive: false});
+        document.addEventListener('pointermove', this.onMove, {passive: false});
+        document.addEventListener('pointerup', this.onUp);
+        document.addEventListener('pointercancel', this.onUp);
+    }
+
+    onDown(e) {
+        // 編成モード以外は無効
+        if (!isGroupEditMode) return;
+        
+        const card = e.target.closest('.student-card');
+        if (!card) return;
+
+        this.dragEl = card;
+        this.startX = e.clientX;
+        this.startY = e.clientY;
+        this.isDragging = false;
+        
+        // スクロール等の誤作動防止はまだしない（クリック判定のため）
+    }
+
+    onMove(e) {
+        if (!this.dragEl) return;
+
+        // ドラッグ開始判定 (5px移動)
+        if (!this.isDragging) {
+            const dist = Math.hypot(e.clientX - this.startX, e.clientY - this.startY);
+            if (dist > 5) {
+                this.startDrag(e);
+            }
+        }
+
+        if (this.isDragging && this.avatar) {
+            e.preventDefault(); // スクロール防止
+            
+            // アバター移動
+            this.avatar.style.left = e.clientX + 'px';
+            this.avatar.style.top = e.clientY + 'px';
+            
+            // ドロップ先の探索
+            this.avatar.style.display = 'none'; // 裏にある要素を取得するため隠す
+            const elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+            this.avatar.style.display = '';
+            
+            if (!elemBelow) return;
+
+            // グリッドまたはカードを探す
+            const targetGrid = elemBelow.closest('.card-grid');
+            const targetCard = elemBelow.closest('.student-card');
+
+            if (targetGrid) {
+                if (targetCard && targetCard !== this.placeholder && targetCard !== this.dragEl) {
+                    // カードの上：前後判定
+                    const rect = targetCard.getBoundingClientRect();
+                    const next = (e.clientX - rect.left) > (rect.width / 2);
+                    if (next) {
+                        targetGrid.insertBefore(this.placeholder, targetCard.nextSibling);
+                    } else {
+                        targetGrid.insertBefore(this.placeholder, targetCard);
+                    }
+                } else if (!targetCard && targetGrid.children.length === 0) {
+                    // 空のグリッド
+                    targetGrid.appendChild(this.placeholder);
+                } else if (!targetCard) {
+                    // グリッド内の余白：末尾へ
+                    targetGrid.appendChild(this.placeholder);
+                }
+            }
+            
+            // 画面端スクロール (簡易実装)
+            const scrollMargin = 50;
+            const scrollStep = 10;
+            const wrapper = document.getElementById('cards-area-wrapper');
+            if(wrapper){
+                const r = wrapper.getBoundingClientRect();
+                if(e.clientY < r.top + scrollMargin) wrapper.scrollTop -= scrollStep;
+                if(e.clientY > r.bottom - scrollMargin) wrapper.scrollTop += scrollStep;
+            }
+        }
+    }
+
+    startDrag(e) {
+        this.isDragging = true;
+        const rect = this.dragEl.getBoundingClientRect();
+        
+        // プレースホルダー作成
+        this.placeholder = this.dragEl.cloneNode(true);
+        this.placeholder.className = 'student-card card-placeholder';
+        this.placeholder.innerHTML = ''; // 中身なし
+        
+        // アバター作成
+        this.avatar = this.dragEl.cloneNode(true);
+        this.avatar.classList.add('card-avatar');
+        this.avatar.style.width = rect.width + 'px';
+        this.avatar.style.height = rect.height + 'px';
+        // 中央配置調整
+        this.avatar.style.marginLeft = -(rect.width/2) + 'px';
+        this.avatar.style.marginTop = -(rect.height/2) + 'px';
+        
+        document.body.appendChild(this.avatar);
+        
+        // DOM操作
+        this.dragEl.parentNode.insertBefore(this.placeholder, this.dragEl);
+        this.dragEl.style.display = 'none';
+        
+        // 初期位置合わせ
+        this.avatar.style.left = e.clientX + 'px';
+        this.avatar.style.top = e.clientY + 'px';
+    }
+
+    onUp(e) {
+        if (!this.dragEl) return;
+
+        if (this.isDragging) {
+            // ドロップ確定
+            if (this.placeholder && this.placeholder.parentNode) {
+                this.placeholder.parentNode.insertBefore(this.dragEl, this.placeholder);
+                
+                // データ上の並び順をDOMに合わせて更新
+                updateStudentOrder();
+            }
+            this.dragEl.style.display = '';
+            this.cleanup();
+        } else {
+            // ドラッグせずに離した -> クリック扱い
+            // タッチ環境でのタップ処理を発火させるため、ここでは何もしない
+            // (clickイベントが別途発生する)
+        }
+        
+        this.dragEl = null;
+        this.isDragging = false;
+    }
+
+    cleanup() {
+        if (this.avatar) this.avatar.remove();
+        if (this.placeholder) this.placeholder.remove();
+        this.avatar = null;
+        this.placeholder = null;
+    }
+}
+
+// --- 初期化 ---
+const dndManager = new SimpleDnD();
+
+window.onload = () => {
+    loadData();
+    renderClassList();
+    updateClassSelects();
+    
+    document.getElementById('modal-confirm-btn').onclick = () => {
+        if (pendingConfirmAction) pendingConfirmAction();
+        closeModal();
+    };
+
+    window.addEventListener('beforeunload', (e) => {
+        if (appData.classes.length > 0 || currentCount > 0) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+};
+
+// --- 音声処理 ---
+function initAudio() {
+    if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+}
+
+function playTone(type) {
+    if (!audioCtx) initAudio();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (type === 'touch') {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(880, now);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'count') {
+        osc.type = 'square'; osc.frequency.setValueAtTime(523.25, now);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now); osc.stop(now + 0.15);
+    }
+}
+
+// --- 計測ロジック ---
+function manualAdjust(delta) {
+    if (delta > 0) incrementCounter();
+    else if (currentCount > 0) {
+        currentCount--; updateClassCount(currentCount); renderCounter();
+    }
+}
+function incrementCounter() {
+    initAudio();
+    if (currentCount >= MAX_COUNT) return;
+    currentCount++; playTone('count'); updateClassCount(currentCount); renderCounter();
+}
+function updateClassCount(count) {
+    if (currentClassId) {
+        const cls = appData.classes.find(c => c.id === currentClassId);
+        if (cls) { cls.currentCount = count; saveData(); }
+    }
+}
+function renderCounter() {
+    const btn = document.getElementById('counter-btn');
+    const display = document.getElementById('counter-display');
+    if (currentCount === 0) {
+        display.innerText = "START";
+        btn.style.backgroundColor = "var(--primary-color)";
+    } else {
+        display.innerText = `${currentCount}回`;
+        btn.style.backgroundColor = currentCount > 200 ? "var(--danger-color)" : "var(--primary-color)";
+    }
+}
+function confirmResetCounter() {
+    showConfirmModal('計測カウントをリセットして最初から始めますか？', () => {
+        currentCount = 0; updateClassCount(0); renderCounter(); showToast("カウンターをリセットしました");
+    });
+}
+
+// カウンター長押し
+let pressTimer;
+const counterBtn = document.getElementById('counter-btn');
+const startPressTimer = () => { pressTimer = setTimeout(() => confirmResetCounter(), 1000); };
+const clearPressTimer = () => clearTimeout(pressTimer);
+counterBtn.addEventListener('mousedown', startPressTimer);
+counterBtn.addEventListener('mouseup', clearPressTimer);
+counterBtn.addEventListener('mouseleave', clearPressTimer);
+counterBtn.addEventListener('touchstart', startPressTimer);
+counterBtn.addEventListener('touchend', clearPressTimer);
+
+// --- グループ管理 & 表示 ---
+function toggleGroupEditMode() {
+    isGroupEditMode = document.getElementById('group-edit-toggle').checked;
+    renderStudentCards();
+    showToast(isGroupEditMode ? "編成モード: カードを移動できます" : "計測モード: カード移動不可");
+}
+
+function changeGroupCount(numStr) {
+    if (!currentClassId) return;
+    const numGroups = parseInt(numStr);
+    const cls = appData.classes.find(c => c.id === currentClassId);
+    if (!cls) return;
+    const students = cls.students;
+    const perGroup = Math.ceil(students.length / numGroups);
+    students.forEach((s, index) => {
+        let groupIndex = Math.floor(index / perGroup) + 1;
+        if (groupIndex > numGroups) groupIndex = numGroups;
+        s.group = groupIndex;
+    });
+    cls.groupCount = numGroups;
+    saveData();
+    renderStudentCards();
+    showToast(`${numGroups}グループに均等配置しました`);
+}
+
+function loadClassForMeasure() {
+    const sel = document.getElementById('measure-class-select');
+    if (!sel.value) return;
+    currentClassId = parseInt(sel.value);
+    const cls = appData.classes.find(c => c.id === currentClassId);
+    if (cls) {
+        currentCount = cls.currentCount || 0;
+        document.getElementById('measure-group-count').value = cls.groupCount || 1;
+        // データ補正
+        cls.students.forEach(s => { if (!s.group) s.group = 1; });
+    } else {
+        currentCount = 0;
+    }
+    renderCounter();
+    renderStudentCards();
+}
+
+function renderStudentCards() {
+    const wrapper = document.getElementById('cards-area-wrapper');
+    wrapper.innerHTML = "";
+    const cls = appData.classes.find(c => c.id === currentClassId);
+    if (!cls) return;
+
+    const groupCount = cls.groupCount || 1;
+    const genderFilter = document.getElementById('measure-gender-filter').value;
+    let activeCount = 0;
+
+    for (let i = 1; i <= groupCount; i++) {
+        const container = document.createElement('div');
+        container.className = "group-container";
+        
+        if (groupCount > 1) {
+            const header = document.createElement('div');
+            header.className = "group-header";
+            header.innerHTML = `<span>グループ ${i}</span>`;
+            container.appendChild(header);
+        }
+
+        const grid = document.createElement('div');
+        grid.className = "card-grid";
+        grid.dataset.group = i; // DnD用
+        
+        const groupStudents = cls.students.filter(s => (s.group || 1) === i);
+        
+        groupStudents.forEach(student => {
+            if (genderFilter !== 'all' && student.gender !== genderFilter) return;
+            if (!student.isOut) activeCount++;
+
+            const card = document.createElement('div');
+            card.dataset.id = student.id;
+            
+            // クラス名設定
+            let classes = "student-card";
+            if (student.gender === 'M') classes += " male";
+            else if (student.gender === 'F') classes += " female";
+            if (student.isOut) classes += " is-out";
+            if (isGroupEditMode) classes += " cursor-grab";
+            
+            card.className = classes;
+            
+            // クリックイベント
+            card.onclick = (e) => {
+                // ドラッグ直後のクリック誤動作防止はSimpleDnD側で制御していないため、
+                // 簡易的に「編成モード中はクリック無効」とするのが安全
+                if (isGroupEditMode) return;
+                toggleStudentStatus(student.id);
+            };
+
+            card.innerHTML = `
+                <div style="position:absolute; top:2px; left:6px; font-size:10px; font-weight:bold; opacity:0.5;">${student.id}</div>
+                <div style="font-weight:bold; font-size:1.125rem; text-align:center; width:100%; padding:0 4px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${student.name}</div>
+                ${student.isOut 
+                    ? `<div style="font-size:1.5rem; font-weight:900; color:#4b5563; margin-top:2px;">${student.score}回</div>` 
+                    : `<div style="font-size:0.75rem; color:#9ca3af; margin-top:4px;">走行中</div>`
+                }
+            `;
+            grid.appendChild(card);
+        });
+        container.appendChild(grid);
+        wrapper.appendChild(container);
+    }
+    document.getElementById('active-count').innerText = activeCount;
+}
+
+// DnD後のデータ更新
+function updateStudentOrder() {
+    const cls = appData.classes.find(c => c.id === currentClassId);
+    if (!cls) return;
+
+    const newStudents = [];
+    const wrapper = document.getElementById('cards-area-wrapper');
+    const grids = wrapper.querySelectorAll('.card-grid');
+
+    grids.forEach(grid => {
+        const groupNum = parseInt(grid.dataset.group);
+        const cards = grid.children;
+        Array.from(cards).forEach(card => {
+            const studentId = parseInt(card.dataset.id);
+            const student = cls.students.find(s => s.id === studentId);
+            if (student) {
+                student.group = groupNum;
+                newStudents.push(student);
+            }
+        });
+    });
+    
+    // フィルタリングで見えていない生徒も保持
+    const displayedIds = new Set(newStudents.map(s => s.id));
+    const hiddenStudents = cls.students.filter(s => !displayedIds.has(s.id));
+    
+    cls.students = [...newStudents, ...hiddenStudents];
+    saveData();
+    // 再描画は不要（DOMは既に移動済み）だが、カウンター等は更新が必要かも
+}
+
+function toggleStudentStatus(studentId) {
+    initAudio();
+    if (currentCount === 0) {
+        showToast("計測を開始してください");
+        return;
+    }
+    const cls = appData.classes.find(c => c.id === currentClassId);
+    const student = cls.students.find(s => s.id === studentId);
+    if (student) {
+        if (!student.isOut) {
+            playTone('touch');
+            student.isOut = true;
+            student.score = currentCount;
+            saveData();
+            renderStudentCards();
+            showToast(`${student.name}さん: ${currentCount}回で記録しました`);
+        } else {
+            showConfirmModal(`${student.name}さんの記録を取り消して復帰させますか？`, () => {
+                student.isOut = false;
+                student.score = null;
+                saveData();
+                renderStudentCards();
+                showToast(`${student.name}さんを復帰させました`);
+            });
+        }
+    }
+}
+
+// --- 共通 ---
+function showConfirmModal(msg, action, isDanger=false) {
+    document.getElementById('modal-message').innerText = msg;
+    const btn = document.getElementById('modal-confirm-btn');
+    btn.className = isDanger ? "btn btn-red" : "btn btn-blue";
+    pendingConfirmAction = action;
+    document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal() {
+    document.getElementById('modal-overlay').classList.add('hidden');
+    pendingConfirmAction = null;
+}
+function loadData() {
+    const json = localStorage.getItem('shuttleRunData');
+    if (json) appData = JSON.parse(json);
+}
+function saveData() {
+    localStorage.setItem('shuttleRunData', JSON.stringify(appData));
+}
+function resetAllData() {
+    showConfirmModal('全てのデータを削除しますか？', () => {
+        appData = { classes: [] }; saveData(); renderClassList(); updateClassSelects(); currentCount = 0; renderCounter(); showToast("リセットしました");
+    }, true);
+}
+function navigateTo(screenId) {
+    document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+    document.getElementById('screen-' + screenId).classList.remove('hidden');
+    document.getElementById('current-screen-name').innerText = {'register': 'クラス登録', 'measure': '計測画面', 'result': '記録一覧'}[screenId];
+    if (screenId === 'measure') {
+        if (currentClassId) document.getElementById('measure-class-select').value = currentClassId;
+        loadClassForMeasure();
+    } else if (screenId === 'result') {
+        if (currentClassId) document.getElementById('result-class-select').value = currentClassId;
+        loadClassForResult();
+    }
+}
+function registerClass() {
+    const name = document.getElementById('reg-class-name').value.trim();
+    const raw = document.getElementById('reg-students-text').value.trim();
+    if (!name || !raw) { showToast("入力を確認してください"); return; }
+    
+    const students = [];
+    const lines = raw.split(/\r\n|\n/);
+    
+    lines.forEach((line, i) => {
+        line = line.trim();
+        if (!line) return;
+
+        // 区切り文字による分割（タブ優先、次にカンマ、最後にスペース）
+        let parts = [];
+        if (line.indexOf('\t') !== -1) {
+            parts = line.split('\t');
+        } else if (line.indexOf(',') !== -1) {
+            parts = line.split(',');
+        } else {
+            parts = line.split(/[\s\u3000]+/);
+        }
+        
+        // 空白除去
+        parts = parts.map(p => p.trim()).filter(p => p !== "");
+        if (parts.length === 0) return;
+
+        let genderCode = 'O'; // デフォルト: その他
+        let genderIndex = -1;
+        
+        // 性別判定（配列の後ろから探索して、性別っぽい文字があれば採用）
+        const maleKeys = ['男', '男性', 'm', 'male', 'boy'];
+        const femaleKeys = ['女', '女性', 'f', 'female', 'girl'];
+        
+        for (let j = parts.length - 1; j >= 0; j--) {
+            const txt = parts[j].toLowerCase();
+            if (maleKeys.includes(txt)) {
+                genderCode = 'M';
+                genderIndex = j;
+                break;
+            } else if (femaleKeys.includes(txt)) {
+                genderCode = 'F';
+                genderIndex = j;
+                break;
+            }
+        }
+        
+        // 性別部分が見つかれば、名前候補から削除
+        if (genderIndex !== -1) {
+            parts.splice(genderIndex, 1);
+        }
+        
+        // 出席番号（先頭の要素が数字のみ）の除外判定
+        // 名前となる要素が残っていて、かつ先頭が数字のみの場合
+        if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+            parts.shift(); // 先頭（番号）を削除
+        }
+        
+        // 残った要素を結合して名前とする
+        const studentName = parts.join(" ");
+        
+        if (studentName) {
+            students.push({ 
+                id: students.length + 1, // IDはここでの連番で振り直す
+                name: studentName, 
+                gender: genderCode, 
+                score: null, 
+                isOut: false, 
+                group: 1 
+            });
+        }
+    });
+
+    if (students.length === 0) { showToast("有効なデータがありません"); return; }
+    
+    appData.classes.push({ id: Date.now(), name: name, students: students, currentCount: 0, groupCount: 1 });
+    saveData();
+    
+    document.getElementById('reg-class-name').value = "";
+    document.getElementById('reg-students-text').value = "";
+    
+    renderClassList();
+    updateClassSelects();
+    showToast(`${name} (${students.length}名) を登録しました`);
+}
+function exportData() {
+    if(appData.classes.length===0) { showToast("データがありません"); return; }
+    const a = document.createElement('a');
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+    a.download = "shuttle_run_" + new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+}
+function triggerImport() { document.getElementById('import-file').click(); }
+function importData(input) {
+    const f=input.files[0]; if(!f)return;
+    const r=new FileReader();
+    r.onload=function(e){
+        try{
+            const j=JSON.parse(e.target.result);
+            if(j && Array.isArray(j.classes)){
+                showConfirmModal("上書き読み込みしますか？", ()=>{
+                    appData=j; saveData(); renderClassList(); updateClassSelects(); currentCount=0; renderCounter(); showToast("読み込みました");
+                }, true);
+            } else showToast("形式エラー");
+        }catch(e){showToast("読込失敗");}
+        input.value='';
+    }; r.readAsText(f);
+}
+function renderClassList() {
+    const c=document.getElementById('class-list-container'); c.innerHTML="";
+    if(appData.classes.length===0) { c.innerHTML='<div style="text-align:center; color:#9ca3af; padding:1rem;">なし</div>'; return; }
+    appData.classes.forEach(cls => {
+        const d=document.createElement('div');
+        d.style.cssText = "background:white; padding:0.75rem; border-radius:0.5rem; box-shadow:0 1px 3px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center;";
+        d.innerHTML=`<div><span class="font-bold text-lg">${cls.name}</span><span class="text-sm" style="color:#6b7280; margin-left:0.5rem;">${cls.students.length}名</span></div><button onclick="deleteClass(${cls.id})" style="color:var(--danger-color); border:none; background:none; cursor:pointer;"><svg class="icon" viewBox="0 0 448 512"><path d="M32 464a48 48 0 0 0 48 48h288a48 48 0 0 0 48-48V128H32zm272-256a16 16 0 0 1 32 0v224a16 16 0 0 1-32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1-32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1-32 0zM432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"/></svg></button>`;
+        c.appendChild(d);
+    });
+}
+function deleteClass(id) {
+    showConfirmModal("削除しますか？", ()=>{
+        appData.classes=appData.classes.filter(c=>c.id!==id); saveData(); renderClassList(); updateClassSelects(); showToast("削除しました");
+    }, true);
+}
+function updateClassSelects() {
+    ['measure-class-select','result-class-select'].forEach(id=>{
+        const s=document.getElementById(id); s.innerHTML="";
+        appData.classes.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.text=c.name; s.appendChild(o); });
+    });
+}
+function loadClassForResult() {
+    const s=document.getElementById('result-class-select'); if(!s.value)return;
+    renderResultTable(parseInt(s.value), currentSortType);
+    updateSortButtons(currentSortType);
+}
+function renderResultTable(cid, sort) {
+    const t=document.getElementById('result-table-body'); t.innerHTML="";
+    const c=appData.classes.find(c=>c.id===cid); if(!c)return;
+    let st=[...c.students];
+    if(sort==='score') st.sort((a,b)=>(b.score||0)-(a.score||0)); else st.sort((a,b)=>a.id-b.id);
+    st.forEach(s=>{
+        const tr=document.createElement('tr');
+        const sc=s.score!==null?`${s.score}回`:'-';
+        const gd=s.gender==='M'?'<span style="color:#2563eb">男</span>':(s.gender==='F'?'<span style="color:#db2777">女</span>':'他');
+        tr.innerHTML=`<td>${s.id}</td><td style="font-weight:bold;">${s.name}</td><td>${gd}</td><td style="font-weight:bold;">${sc}</td>`;
+        t.appendChild(tr);
+    });
+}
+function sortResults(type) { currentSortType=type; loadClassForResult(); }
+function updateSortButtons(type) {
+    document.getElementById('btn-sort-score').className = type==='score' ? "btn btn-orange" : "btn btn-gray";
+    document.getElementById('btn-sort-number').className = type==='number' ? "btn btn-indigo" : "btn btn-gray";
+}
+function copyToClipboard() {
+    const s=document.getElementById('result-class-select'); if(!s.value)return;
+    const c=appData.classes.find(x=>x.id===parseInt(s.value));
+    let t="出席番号\t氏名\t性別\t回数\n";
+    c.students.forEach(s=>{ t+=`${s.id}\t${s.name}\t${s.gender==='M'?'男':(s.gender==='F'?'女':'他')}\t${s.score||''}\n`; });
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>showToast("コピーしました")).catch(()=>fallbackCopy(t)); else fallbackCopy(t);
+}
+function fallbackCopy(t) {
+    const a=document.createElement("textarea"); a.value=t; document.body.appendChild(a); a.select();
+    try{document.execCommand('copy');showToast("コピーしました");}catch(e){showToast("失敗");} document.body.removeChild(a);
+}
+function showToast(m) {
+    const t=document.getElementById('toast'); t.innerText=m; t.style.opacity=1; setTimeout(()=>t.style.opacity=0,3000);
+}
+</script>
+</body>
+</html>
